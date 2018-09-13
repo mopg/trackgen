@@ -1,6 +1,7 @@
 import numpy as np
 from math import *
-import scipy
+import matplotlib.pyplot as plt
+# from scipy import
 
 class Track( object ):
     '''
@@ -30,6 +31,10 @@ class Track( object ):
         # - end angle
         # end point
         return 0
+
+    def plot( self ):
+
+        plotTrack( self.crns, self.lpar, self.delTh )
 
 
 def compLength( crns, lpar, delTh ):
@@ -66,23 +71,23 @@ def compEndpoint( crns, lpar, delTh ):
 
     # set up arrays for gradient info
     dxend_dlpar  = np.zeros( np.size(lpar) )
-    dxend_ddelth = np.zeros( np.size(delth) )
+    dxend_ddelth = np.zeros( np.size(delTh) )
     dyend_dlpar  = np.zeros( np.size(lpar) )
-    dyend_ddelth = np.zeros( np.size(delth) )
+    dyend_ddelth = np.zeros( np.size(delTh) )
 
     thcum = 0.
 
     for jj in range(0,len(crns)):
         if crns[jj]:
-            delx =        abs(lpar[jj]) * cos( delTh[jj] ) # local coordinate frame
-            dely = lpar[jj] - lpar[jj]  * sin( delTh[jj] ) # local coordinate frame
+            delx =        abs(lpar[jj]) * sin( delTh[jj] ) # local coordinate frame
+            dely = lpar[jj] - lpar[jj]  * cos( delTh[jj] ) # local coordinate frame
 
             # map to global coordinate frame
             xend += delx * cos(thcum) - dely * sin(thcum)
             yend += dely * cos(thcum) + delx * sin(thcum)
 
             # update cumulative angle
-            thcum += delTh[jj]
+            thcum += np.sign(lpar[jj]) * delTh[jj]
         else:
             xend  += lpar[jj] * cos(thcum)
             yend  += lpar[jj] * sin(thcum)
@@ -98,6 +103,61 @@ def compCurvature( delTh ):
 
     return np.norm(delTh)
 
-def plotTrack( ):
+def plotTrack( crns, lpar, delTh, width ):
 
-    return 0
+    nplot = 50 # number of points used for corners
+
+    nseg  = len(crns)
+    ncrns = sum(crns)
+    npts  = ncrns * nplot + ( nseg - ncrns ) * 2 + 1
+
+    xmid = np.zeros( (npts,) )
+    ymid = np.zeros( (npts,) )
+
+    theta = np.zeros( (npts,) )
+
+    thcum = 0.
+
+    ind = 0
+
+    for jj in range( 0, nseg ):
+        if crns[jj]:
+            phi = np.linspace( 0., delTh[jj], nplot )
+
+            delx =        abs(lpar[jj]) * np.sin( phi ) # local coordinate frame
+            dely = lpar[jj] - lpar[jj]  * np.cos( phi ) # local coordinate frame
+
+            # map to global coordinate frame
+            xmid[(ind+1):(ind+nplot+1)] = xmid[ind] + delx * cos(thcum) - dely * sin(thcum)
+            ymid[(ind+1):(ind+nplot+1)] = ymid[ind] + dely * cos(thcum) + delx * sin(thcum)
+
+            # update cumulative angle
+            thcum += np.sign(lpar[jj]) * delTh[jj]
+            theta[(ind+1):(ind+nplot+1)] = theta[ind] + np.sign(lpar[jj]) * phi
+
+            ind += nplot
+
+        else:
+            xmid[ind+1] = xmid[ind]
+            ymid[ind+1] = ymid[ind]
+            xmid[ind+2] = xmid[ind] + lpar[jj] * cos(thcum)
+            ymid[ind+2] = ymid[ind] + lpar[jj] * sin(thcum)
+
+            theta[ind+1] = theta[ind]
+            theta[ind+2] = theta[ind]
+
+            ind += 2
+
+    xb1 = xmid + width/2 * np.sin( theta )
+    yb1 = ymid - width/2 * np.cos( theta )
+    xb2 = xmid - width/2 * np.sin( theta )
+    yb2 = ymid + width/2 * np.cos( theta )
+
+    print "End point = (%4.3f, %4.3f)" % (xmid[-1], ymid[-1])
+
+    plt.plot(xmid,ymid)
+    plt.plot(xb1,yb1)
+    plt.plot(xb2,yb2)
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.show()
