@@ -115,30 +115,6 @@ def eqConstr( x, crns, leng, left ):
     constr[3] -= (-1 + left*2)*2*pi
     return constr
 
-def eqConstrGrad( x, crns, leng, left ):
-    '''
-    Computes the gradient of the equality constraints for `x`.
-    Note that this function is separate from `eqConstr`, because the scipy
-    does not allow for computing the function value and its constraints in one go,
-    leading a lot of code duplication. Good job scipy.
-    '''
-    gradLength = np.zeros( ( len(x), ) )
-    gradXend   = np.zeros( ( len(x), ) )
-    gradYend   = np.zeros( ( len(x), ) )
-    gradThcum  = np.zeros( ( len(x), ) )
-
-    nseg = int( len(x)/2 )
-
-    # length constraint
-    gradLength[0:nseg], gradLength[nseg:] = compLengthGrad( crns, x[0:nseg], x[nseg:] )
-
-    # end point constraints and angle constraint
-    gradXend[0:nseg], gradXend[nseg:], \
-        gradYend[0:nseg], gradYend[nseg:], \
-        gradThcum[nseg:] = compEndpointGrad( crns, x[0:nseg], x[nseg:] )
-
-    return gradLength, gradXend, gradYend, gradThcum
-
 def compLength( crns, lpar, delTh ):
     '''
     Computes final length of track, defined by corner definition `crns`, length
@@ -154,26 +130,6 @@ def compLength( crns, lpar, delTh ):
             trlen += lpar[jj]
 
     return trlen
-
-def compLengthGrad( crns, lpar, delTh ):
-    '''
-    Computes gradient of final length of track (defined by corner definition `crns`,
-    length parameters `lpar`, and angle changes `delTh`) with respect to design
-    variables.
-    '''
-
-    # set up arrays for gradient info
-    dtrl_dlpar  = np.zeros( np.shape(lpar) )
-    dtrl_ddelth = np.zeros( np.shape(delTh) )
-
-    for jj in range(0,len(crns)):
-        if crns[jj]:
-            dtrl_dlpar[jj]  = delTh[jj]
-            dtrl_ddelth[jj] = abs(lpar[jj])
-        else:
-            dtrl_dlpar[jj] = 1.
-
-    return dtrl_dlpar, dtrl_ddelth
 
 def compEndpoint( crns, lpar, delTh ):
     '''
@@ -208,116 +164,6 @@ def compEndpoint( crns, lpar, delTh ):
             yend += lpar[jj] * sin(thcum)
 
     return xend, yend, thcum
-
-def compEndpointGrad( crns, lpar, delTh ):
-    '''
-    Computes end point of track, defined by corner definition `crns`,
-    length parameters `lpar`, and angle changes `delTh`.
-    Also computes gradient with respect to design variables.
-    '''
-
-    xend = 0.
-    yend = 0.
-
-    # set up arrays for gradient info
-    nseg = len( lpar )
-    dxend_dlpar   = np.zeros( (nseg,) )
-    dxend_ddelth  = np.zeros( (nseg,) )
-    dyend_dlpar   = np.zeros( (nseg,) )
-    dyend_ddelth  = np.zeros( (nseg,) )
-
-    dthcum_ddelth = np.zeros( (nseg,) ) # no adjoint necessary for this
-
-    thcum = 0.
-
-    # for gradient computation, need to keep intermediate values
-    xend  = np.zeros( (nseg,) )
-    yend  = np.zeros( (nseg,) )
-    thcum = np.zeros( (nseg,) )
-
-    for jj in range(0,len(crns)):
-        jjm1 = max(jj-1,0)
-        if crns[jj]:
-            delx =        abs(lpar[jj]) * sin( delTh[jj] ) # local coordinate frame
-            dely = lpar[jj] - lpar[jj]  * cos( delTh[jj] ) # local coordinate frame
-
-            # map to global coordinate frame
-            xend[jj] = xend[jjm1] + delx * cos(thcum[jjm1]) - dely * sin(thcum[jjm1])
-            yend[jj] = yend[jjm1] + dely * cos(thcum[jjm1]) + delx * sin(thcum[jjm1])
-
-            # update cumulative angle
-            thcum[jj] = thcum[jjm1] + np.sign(lpar[jj]) * delTh[jj]
-        else:
-            xend[jj]  = xend[jjm1] + lpar[jj] * cos(thcum[jjm1])
-            yend[jj]  = yend[jjm1] + lpar[jj] * sin(thcum[jjm1])
-            thcum[jj] = thcum[jjm1]
-
-    # compute gradient through adjoint
-    # NOTE: these are all separate (three different adjoints)
-    dxend  = 1.
-    dyend  = 1.
-    dthcum_x = 0. # this is only used to track the adjoint of dxend
-    dthcum_y = 0. # this is only used to track the adjoint of dyend
-    for jj in range(len(crns)-1,0,-1):
-        dthcumm1_x = 0.
-        dthcumm1_y = 0.
-        if crns[jj]:
-
-            ## gradient of dthcum_ddelth (no adjoint used)
-            dthcum_ddelth[jj] = np.sign(lpar[jj])
-
-            ## Recompute
-            delx =        abs(lpar[jj]) * sin( delTh[jj] ) # local coordinate frame
-            dely = lpar[jj] - lpar[jj]  * cos( delTh[jj] ) # local coordinate frame
-
-            ## Start adjoint computation
-
-            # map to global coordinate frame
-            # xend[jj] = xend[jjm1] + delx * cos(thcum[jjm1]) - dely * sin(thcum[jjm1])
-            # yend[jj] = yend[jjm1] + dely * cos(thcum[jjm1]) + delx * sin(thcum[jjm1])
-            ddelx_x =   dxend * cos(thcum[jjm1])
-            ddely_x = - dyend * sin(thcum[jjm1])
-            ddelx_y =   dxend * sin(thcum[jjm1])
-            ddely_y =   dyend * cos(thcum[jjm1])
-            dthcumm1_x = - sin(thcum[jjm1]) * delx * dxend - dely * cos(thcum[jjm1]) * dxend
-            dthcumm1_y = - sin(thcum[jjm1]) * dely * dyend + delx * cos(thcum[jjm1]) * dyend
-
-            # update cumulative angle
-            # thcum[jj] = thcum[jjm1] + np.sign(lpar[jj]) * delTh[jj]
-            # dthcum_ddelth[jj] = np.sign(lpar[jj]) * dthcum # NOTE: already taken care of
-            dthcumm1_y += dthcum_x
-            dthcumm1_y += dthcum_y
-
-            # local updates
-            # delx =        abs(lpar[jj]) * sin( delTh[jj] )
-            # dely = lpar[jj] - lpar[jj]  * cos( delTh[jj] )
-            dxend_ddelth[jj] = cos(delTh[jj]) * abs(lpar[jj]) * ddelx_x - \
-                              sin(delTh[jj]) * lpar[jj] * ddely_x
-            dyend_ddelth[jj] = cos(delTh[jj]) * abs(lpar[jj]) * ddelx_y - \
-                              sin(delTh[jj]) * lpar[jj] * ddely_y
-            dxend_dlpar[jj]  = ( sin( delTh[jj] ) * np.sign( lpar[jj] ) ) * ddelx_x + \
-                              ( 1. - cos( delTh[jj] ) ) * ddely_x
-            dyend_dlpar[jj]  = ( sin( delTh[jj] ) * np.sign( lpar[jj] ) ) * ddelx_y + \
-                              ( 1. - cos( delTh[jj] ) ) * ddely_y
-
-        else:
-            # thcum[jj] = thcum[jjm1]
-            dthcumm1_x += dthcum_x
-            dthcumm1_y += dthcum_y
-
-            # xend[jj]  = xend[jjm1] + lpar[jj] * cos(thcum[jjm1])
-            dthcumm1_x     += -lpar[jj] * sin(thcum[jjm1]) * dxend
-            dxend_dlpar[jj] += cos(thcum[jjm1]) * dxend
-
-            # yend[jj]  = yend[jjm1] + lpar[jj] * sin(thcum[jjm1])
-            dthcumm1_x     += lpar[jj] * cos(thcum[jjm1]) * dyend
-            dyend_dlpar[jj] += sin(thcum[jjm1]) * dyend
-
-        dthcum_x = dthcumm1_x # remember we're doing this in reverse
-        dthcum_y = dthcumm1_y # remember we're doing this in reverse
-
-    return ( dxend_dlpar, dxend_ddelth, dyend_dlpar,
-             dyend_ddelth, dthcum_ddelth )
 
 def compCurvature( delTh ):
     '''
