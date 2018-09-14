@@ -2,21 +2,25 @@ import numpy as np
 from math import *
 from trackgen import *
 
-crns = np.array( [False,True,False,True,True,True,False], dtype=bool )
+crns = np.array( [False,True,False,True,True,True,False,True,True,False], dtype=bool )
 
 # Change in angle (needs to be zero for straight)
-delTh = np.array( [0,pi/4,0,pi/2,pi,pi/4,0], dtype=float )
+delTh = np.array( [0,pi/2,0,pi/2,pi/2,pi/2,0,pi/4,pi/4,0], dtype=float )
 
 # length parameter initial guess (radius for corner, length for straight)
-lpar = np.array( [20,10,10,-10,-10,10,20], dtype=float )
+lpar = np.array( [20,10,20,10,-10,10,200,-10,10,200], dtype=float )
 
-track = Track( length = 500., left = True )
+track = Track( length = 500., left = True, crns = crns )
 
-xe, ye, thcum, dx_dlp, dx_ddth, dy_dlp, dy_ddth, dth_ddth = compEndpoint( crns, lpar, delTh )
+sol = track.solve( lpar, delTh, case = 0 )
 
-print "End point   = (%4.3f, %4.3f)" % (xe, ye)
-print "Final angle =  %4.3f" % (thcum)
+xe, ye, thcum = track.endpoint()
 
-print dx_ddth
+print( "End point   = (%4.3f, %4.3f)" % (xe, ye) )
+print( "Final angle =  %4.3f" % (thcum) )
 
-plotTrack( crns, lpar, delTh, 2. )
+# initial track
+# plotTrack( crns, lpar, delTh, 2. )
+
+# final track
+# track.plot()
