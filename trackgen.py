@@ -7,6 +7,21 @@ class Track( object ):
     '''
     Track object holds all parameters defining the track, as well as the
     constraints under which this track was designed.
+
+    Attributes:
+        length      Desired length of track
+        rmin        Minimum corner radius
+        rmax        Maximum corner radius
+        lmax        Maximum straight length
+        lmin        Minimum straight length
+        dthmax      Maximum angle change of corner
+        dthmin      Minimum angle change of corner
+        left        Orientation of track (Left-turning if True)
+        width       Track width
+        crns        Track lay-out
+        lpar        Optimized length parameters
+        delTh       Optimized angle changes
+        optimized   Has this track been optimized yet?
     '''
 
     def __init__( self, length = 500., rmin = 9.,
@@ -29,7 +44,16 @@ class Track( object ):
         self.lpar  = np.zeros( np.shape(crns), dtype=float )
         self.delTh = np.zeros( np.shape(crns), dtype=float )
 
+        self.optimized = False
+
     def solve( self, lpar_init, delTh_init, case = 0 ):
+        '''
+        Solves the optimization problem that ensures the track has the correct
+        length, curvature, etc. using an SLSQP algorithm.
+        - Case 0: maximizes curvature
+        - Case 1: minimizes curvature
+        - Case 2: only satisfies constraints
+        '''
 
         nseg = len(lpar_init)
         assert nseg == len( delTh_init )
@@ -90,14 +114,23 @@ class Track( object ):
         self.lpar  = soldict.x[0:nseg]
         self.delTh = soldict.x[nseg:]
 
+        self.optimized = False
+
         return soldict
 
     def plot( self ):
-
-        plotTrack( self.crns, self.lpar, self.delTh, self.width )
+        '''
+        Plots the track defined in the Track object.
+        '''
+        if self.optimized:
+            plotTrack( self.crns, self.lpar, self.delTh, self.width )
+        else:
+            print("First optimize the track!")
 
     def endpoint( self ):
-
+        '''
+        Returns endpoint of the track. If optimization is successful, should be the origin.
+        '''
         return compEndpoint( self.crns, self.lpar, self.delTh )
 
 def eqConstr( x, crns, leng, left ):
@@ -182,7 +215,9 @@ def compCurvature( lpar, delTh, lmax, dthmax ):
     return curv, dcurvdlpar, dcurvddelth
 
 def objMaxCurv( x, lmax, dthmax ):
-
+    '''
+    Objective function for maximum curvature.
+    '''
     nseg = int( len( x )/2 )
 
     c, dcdlpar, dcddelth = compCurvature( x[0:nseg], x[nseg:], lmax, dthmax )
@@ -190,7 +225,9 @@ def objMaxCurv( x, lmax, dthmax ):
     return -c, np.hstack( ( -dcdlpar, -dcddelth ) )
 
 def objMinCurv( x, lmax, dthmax ):
-
+    '''
+    Objective function for minimum curvature.
+    '''
     nseg = int( len( x )/2 )
 
     c, dcdlpar, dcddelth = compCurvature( x[0:nseg], x[nseg:], lmax, dthmax )
@@ -198,10 +235,15 @@ def objMinCurv( x, lmax, dthmax ):
     return c, np.hstack( ( dcdlpar, dcddelth ) )
 
 def objNone( x, lmax, dthmax ):
-
+    '''
+    Constant objective function.
+    '''
     return 1., np.zeros( (len(x),) )
 
 def plotTrack( crns, lpar, delTh, width ):
+    '''
+    Plots the track in x,y-space using matplotlib.
+    '''
 
     nplot = 50 # number of points used for corners
 

@@ -2,6 +2,7 @@ import numpy as np
 from math import *
 from trackgen import *
 
+# Where are the corners?
 crns = np.array( [False,True,False,True,True,True,False,True,True,False], dtype=bool )
 
 # Change in angle (needs to be zero for straight)
