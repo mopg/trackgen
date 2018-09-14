@@ -10,9 +10,9 @@ delTh = np.array( [0,pi/2,0,pi/2,pi/2,pi/2,0,pi/4,pi/4,0], dtype=float )
 # length parameter initial guess (radius for corner, length for straight)
 lpar = np.array( [20,10,20,10,-10,10,200,-10,10,200], dtype=float )
 
-track = Track( length = 500., left = True, crns = crns )
+track = Track( length = 250., left = True, crns = crns )
 
-sol = track.solve( lpar, delTh, case = 0 )
+sol = track.solve( lpar, delTh, case = 2 )
 
 xe, ye, thcum = track.endpoint()
 

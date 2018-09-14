@@ -81,7 +81,9 @@ class Track( object ):
 
         bnds = Bounds( lb, ub )
 
-        soldict = minimize(fobj, x0, method='SLSQP', jac=True, bounds=bnds, constraints=constr, tol=None, options=None)
+        soldict = minimize( fobj, x0, args=(self.lmax,self.dthmax), method='SLSQP',
+                            jac=True, bounds=bnds, constraints=constr,
+                            tol=None, options=None )
 
         print(soldict.message)
 
@@ -165,31 +167,37 @@ def compEndpoint( crns, lpar, delTh ):
 
     return xend, yend, thcum
 
-def compCurvature( delTh ):
+def compCurvature( lpar, delTh, lmax, dthmax ):
     '''
     Computes track curvature and the gradient of track curvature with respect
     to the design variables.
     '''
 
-    return np.linalg.norm(delTh)**2, 2*delTh
+    curv = ( np.linalg.norm(lpar) / lmax )**2 + \
+           ( np.linalg.norm(delTh) / dthmax )**2
 
-def objMaxCurv( x ):
+    dcurvdlpar  = 2*lpar   / lmax**2
+    dcurvddelth = 2*delTh  / dthmax**2
 
-    nseg = int( len( x )/2 )
+    return curv, dcurvdlpar, dcurvddelth
 
-    c, gradc = compCurvature( x[nseg:] )
-
-    return -c, np.hstack( ( np.zeros((nseg,)), -gradc ) )
-
-def objMinCurv( x ):
+def objMaxCurv( x, lmax, dthmax ):
 
     nseg = int( len( x )/2 )
 
-    c, gradc = compCurvature( x[nseg:] )
+    c, dcdlpar, dcddelth = compCurvature( x[0:nseg], x[nseg:], lmax, dthmax )
 
-    return c, np.hstack( ( np.zeros((nseg,)), gradc ) )
+    return -c, np.hstack( ( -dcdlpar, -dcddelth ) )
 
-def objNone( x ):
+def objMinCurv( x, lmax, dthmax ):
+
+    nseg = int( len( x )/2 )
+
+    c, dcdlpar, dcddelth = compCurvature( x[0:nseg], x[nseg:], lmax, dthmax )
+
+    return c, np.hstack( ( dcdlpar, dcddelth ) )
+
+def objNone( x, lmax, dthmax ):
 
     return 1., np.zeros( (len(x),) )
 
