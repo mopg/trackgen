@@ -114,7 +114,7 @@ class Track( object ):
         self.lpar  = soldict.x[0:nseg]
         self.delTh = soldict.x[nseg:]
 
-        self.optimized = False
+        self.optimized = True
 
         return soldict
 
@@ -123,7 +123,7 @@ class Track( object ):
         Plots the track defined in the Track object.
         '''
         if self.optimized:
-            plotTrack( self.crns, self.lpar, self.delTh, self.width )
+            plotTrack( self.crns, self.lpar, self.delTh, self.width, self.left )
         else:
             print("First optimize the track!")
 
@@ -240,7 +240,7 @@ def objNone( x, lmax, dthmax ):
     '''
     return 1., np.zeros( (len(x),) )
 
-def plotTrack( crns, lpar, delTh, width ):
+def plotTrack( crns, lpar, delTh, width, left ):
     '''
     Plots the track in x,y-space using matplotlib.
     '''
@@ -293,12 +293,15 @@ def plotTrack( crns, lpar, delTh, width ):
     xb2 = xmid - width/2 * np.sin( theta )
     yb2 = ymid + width/2 * np.cos( theta )
 
-    print( "End point = (%4.3f, %4.3f)" % (xmid[-1], ymid[-1]) )
+    if left:
+        plt.fill(xb1,yb1, '0.75' )
+        plt.fill(xb2,yb2, "w" )
+    else:
+        plt.fill(xb2,yb2, '0.75' )
+        plt.fill(xb1,yb1, "w" )
 
-    plt.plot(xmid,ymid)
-    plt.plot(xb1,yb1)
-    plt.plot(xb2,yb2)
-    plt.xlabel('x')
-    plt.ylabel('y')
+    plt.plot(xmid,ymid,"k--",linewidth=1)
+    plt.plot(xb1,yb1,linewidth=2,color="k")
+    plt.plot(xb2,yb2,linewidth=2,color="k")
     plt.axis('equal')
     plt.show()

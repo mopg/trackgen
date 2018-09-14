@@ -20,8 +20,8 @@ xe, ye, thcum = track.endpoint()
 print( "End point   = (%4.3f, %4.3f)" % (xe, ye) )
 print( "Final angle =  %4.3f" % (thcum) )
 
-# initial track
-# plotTrack( crns, lpar, delTh, 2. )
+# initial track -- note how horrific the initial guess is
+# plotTrack( crns, lpar, delTh, track.width, track.left )
 
 # final track
-# track.plot()
+track.plot()
