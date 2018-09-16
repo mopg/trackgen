@@ -24,7 +24,8 @@ This is because there are usually infinitely many tracks that adhere to the cons
 We are solving this problem as a continuous optimization problem, which brings with it certain limitations.
 Once you start with an initial track, certain parameters will not change:
 - number of straights, corners, and their order stays the same;
-- direction of a corner stays the same (i.e., the sign of the radius will not change).
+- direction of a corner stays the same (i.e., the sign of the radius will not change);
+- there is no constraint to prevent the track from intersecting with itself, if that is the case, change the initial track.
 
 ## Notes
 1. The track width is assumed constant, but this can easily be changed to change along the track;
