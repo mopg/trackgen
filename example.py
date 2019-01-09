@@ -24,4 +24,4 @@ print( "Final angle =  %4.3f" % (thcum) )
 # plotTrack( crns, lpar, delTh, track.width, track.left )
 
 # final track
-track.plot()
+track.plot( cones=True )
