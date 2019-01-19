@@ -44,6 +44,18 @@ class Track( object ):
         self.lpar  = np.zeros( np.shape(crns), dtype=float )
         self.delTh = np.zeros( np.shape(crns), dtype=float )
 
+        # boundaries
+        self.xb1 = np.zeros( (0,) )
+        self.xb2 = np.zeros( (0,) )
+        self.yb1 = np.zeros( (0,) )
+        self.yb2 = np.zeros( (0,) )
+        self.xm  = np.zeros( (0,) )
+        self.ym  = np.zeros( (0,) )
+
+        # cones
+        self.xc1 = np.zeros( (0,) )
+        self.xc2 = np.zeros( (0,) )
+
         self.optimized = False
 
     def solve( self, lpar_init, delTh_init, case = 0 ):
@@ -118,20 +130,192 @@ class Track( object ):
 
         return soldict
 
-    def plot( self, cones=False ):
-        '''
-        Plots the track defined in the Track object.
-        '''
-        if self.optimized:
-            plotTrack( self.crns, self.lpar, self.delTh, self.width, self.left, cones )
-        else:
-            print("First optimize the track!")
-
     def endpoint( self ):
         '''
         Returns endpoint of the track. If optimization is successful, should be the origin.
         '''
         return compEndpoint( self.crns, self.lpar, self.delTh )
+
+    def plot( self, cones=False, aveDist=3. ):
+        '''
+        Plots the track defined in the Track object.
+        '''
+        if not self.optimized:
+            warning("Track not optimized!")
+
+        if np.shape(self.xb1)[0] == 0:
+            self.compTrackXY()
+
+        if (np.shape(self.xc1)[0] == 0) and cones:
+            self.populateCones( aveDist )
+
+        # actually plot
+        plt.figure()
+        if self.left:
+            plt.fill(self.xb1,self.yb1, '0.75' )
+            plt.fill(self.xb2,self.yb2, 'w' )
+        else:
+            plt.fill(self.xb2,self.yb2, '0.75' )
+            plt.fill(self.xb1,self.yb1, 'w' )
+
+        plt.plot(self.xmid,self.ymid,'k--',linewidth=1)
+        plt.plot(self.xb1,self.yb1,linewidth=2,color='k')
+        plt.plot(self.xb2,self.yb2,linewidth=2,color='k')
+
+        if cones:
+            plt.plot( self.xc1, self.yc1, 'ro' )
+            plt.plot( self.xc2, self.yc2, 'go' )
+
+        plt.axis('equal')
+        plt.show()
+
+    def compTrackXY( self ):
+        '''
+        Computes track in x,y-space.
+        '''
+
+        nplot = 50 # number of points used for corners
+
+        nseg  = len(self.crns)
+        ncrns = sum(self.crns)
+        npts  = ncrns * nplot + ( nseg - ncrns ) * 2 + 1
+
+        xmid = np.zeros( (npts,) )
+        ymid = np.zeros( (npts,) )
+
+        theta = np.zeros( (npts,) )
+
+        thcum = 0.
+
+        ind = 0
+
+        for jj in range( 0, nseg ):
+            if self.crns[jj]:
+                phi = np.linspace( 0., self.delTh[jj], nplot )
+
+                delx =             abs(self.lpar[jj]) * np.sin( phi ) # local coordinate frame
+                dely = self.lpar[jj] - self.lpar[jj]  * np.cos( phi ) # local coordinate frame
+
+                # map to global coordinate frame
+                xmid[(ind+1):(ind+nplot+1)] = xmid[ind] + delx * cos(thcum) - dely * sin(thcum)
+                ymid[(ind+1):(ind+nplot+1)] = ymid[ind] + dely * cos(thcum) + delx * sin(thcum)
+
+                # update cumulative angle
+                thcum += np.sign(self.lpar[jj]) * self.delTh[jj]
+                theta[(ind+1):(ind+nplot+1)] = theta[ind] + np.sign(self.lpar[jj]) * phi
+
+                ind += nplot
+
+            else:
+                xmid[ind+1] = xmid[ind]
+                ymid[ind+1] = ymid[ind]
+                xmid[ind+2] = xmid[ind] + self.lpar[jj] * cos(thcum)
+                ymid[ind+2] = ymid[ind] + self.lpar[jj] * sin(thcum)
+
+                theta[ind+1] = theta[ind]
+                theta[ind+2] = theta[ind]
+
+                ind += 2
+
+        self.xb1 = xmid + self.width/2 * np.sin( theta )
+        self.yb1 = ymid - self.width/2 * np.cos( theta )
+        self.xb2 = xmid - self.width/2 * np.sin( theta )
+        self.yb2 = ymid + self.width/2 * np.cos( theta )
+
+        self.xmid = xmid
+        self.ymid = ymid
+
+    def populateCones( self, aveDist ):
+        '''
+            Populates track with cones.
+        '''
+        # dist is distance between cones as computed from midline
+
+        nseg = len(self.crns)
+
+        xc1 = np.zeros( (0,) )
+        yc1 = np.zeros( (0,) )
+
+        xc2 = np.zeros( (0,) )
+        yc2 = np.zeros( (0,) )
+
+        thcum = 0.
+
+        for jj in range( 0, nseg ):
+            if self.crns[jj]:
+
+                r1 = self.lpar[jj] - self.width/2
+                r2 = self.lpar[jj] + self.width/2
+
+                n1 = int( ceil( self.delTh[jj] * abs(r1) / aveDist ) ) + 1 # number of points used on left boundary
+                n2 = int( ceil( self.delTh[jj] * abs(r2) / aveDist ) ) + 1 # number of points used on right boundary
+
+                phi1 = np.linspace( 0., self.delTh[jj], n1 )
+                phi2 = np.linspace( 0., self.delTh[jj], n2 )
+
+                # delete first point
+                phi1 = np.delete( phi1, 0 )
+                phi2 = np.delete( phi2, 0 )
+
+                delx1 =  abs(r1) * np.sin( phi1 ) # local coordinate frame
+                dely1 = r1 - r1  * np.cos( phi1 ) # local coordinate frame
+
+                delx2 =  abs(r2) * np.sin( phi2 ) # local coordinate frame
+                dely2 = r2 - r2  * np.cos( phi2 ) # local coordinate frame
+
+                # map to global coordinate frame
+                x1 = delx1 * cos(thcum) - dely1 * sin(thcum)
+                y1 = dely1 * cos(thcum) + delx1 * sin(thcum)
+
+                x2 = delx2 * cos(thcum) - dely2 * sin(thcum)
+                y2 = dely2 * cos(thcum) + delx2 * sin(thcum)
+
+                if len(xc1) > 0:
+                    x1 += xc1[-1]
+                    y1 += yc1[-1]
+                    x2 += xc2[-1]
+                    y2 += yc2[-1]
+
+                # update cumulative angle
+                thcum += np.sign(self.lpar[jj]) * self.delTh[jj]
+
+                # append
+                xc1 = np.hstack( [xc1, x1] )
+                yc1 = np.hstack( [yc1, y1] )
+                xc2 = np.hstack( [xc2, x2] )
+                yc2 = np.hstack( [yc2, y2] )
+
+            else:
+
+                n = int( ceil( self.lpar[jj] / aveDist ) ) + 1
+
+                xloc = np.linspace( 0, self.lpar[jj], n )
+                xloc = np.delete( xloc, 0 )
+
+                x1 = xloc * cos(thcum)
+                y1 = xloc * sin(thcum)
+                x2 = xloc * cos(thcum)
+                y2 = xloc * sin(thcum)
+
+                if len(xc1) > 0:
+                    x1 += xc1[-1]
+                    y1 += yc1[-1]
+                    x2 += xc2[-1]
+                    y2 += yc2[-1]
+                else:
+                    y1 += self.width/2
+                    y2 -= self.width/2
+
+                # append
+                xc1 = np.hstack( [xc1, x1] )
+                yc1 = np.hstack( [yc1, y1] )
+                xc2 = np.hstack( [xc2, x2] )
+                yc2 = np.hstack( [yc2, y2] )
+
+        self.xc1 = xc1
+        self.xc2 = xc2
+        self.yc1 = yc1
+        self.yc2 = yc2
 
 def eqConstr( x, crns, leng, left ):
     '''
@@ -239,162 +423,3 @@ def objNone( x, lmax, dthmax ):
     Constant objective function.
     '''
     return 1., np.zeros( (len(x),) )
-
-def plotTrack( crns, lpar, delTh, width, left, cones ):
-    '''
-    Plots the track in x,y-space using matplotlib.
-    '''
-
-    nplot = 50 # number of points used for corners
-
-    nseg  = len(crns)
-    ncrns = sum(crns)
-    npts  = ncrns * nplot + ( nseg - ncrns ) * 2 + 1
-
-    xmid = np.zeros( (npts,) )
-    ymid = np.zeros( (npts,) )
-
-    theta = np.zeros( (npts,) )
-
-    thcum = 0.
-
-    ind = 0
-
-    for jj in range( 0, nseg ):
-        if crns[jj]:
-            phi = np.linspace( 0., delTh[jj], nplot )
-
-            delx =        abs(lpar[jj]) * np.sin( phi ) # local coordinate frame
-            dely = lpar[jj] - lpar[jj]  * np.cos( phi ) # local coordinate frame
-
-            # map to global coordinate frame
-            xmid[(ind+1):(ind+nplot+1)] = xmid[ind] + delx * cos(thcum) - dely * sin(thcum)
-            ymid[(ind+1):(ind+nplot+1)] = ymid[ind] + dely * cos(thcum) + delx * sin(thcum)
-
-            # update cumulative angle
-            thcum += np.sign(lpar[jj]) * delTh[jj]
-            theta[(ind+1):(ind+nplot+1)] = theta[ind] + np.sign(lpar[jj]) * phi
-
-            ind += nplot
-
-        else:
-            xmid[ind+1] = xmid[ind]
-            ymid[ind+1] = ymid[ind]
-            xmid[ind+2] = xmid[ind] + lpar[jj] * cos(thcum)
-            ymid[ind+2] = ymid[ind] + lpar[jj] * sin(thcum)
-
-            theta[ind+1] = theta[ind]
-            theta[ind+2] = theta[ind]
-
-            ind += 2
-
-    xb1 = xmid + width/2 * np.sin( theta )
-    yb1 = ymid - width/2 * np.cos( theta )
-    xb2 = xmid - width/2 * np.sin( theta )
-    yb2 = ymid + width/2 * np.cos( theta )
-
-    if left:
-        plt.fill(xb1,yb1, '0.75' )
-        plt.fill(xb2,yb2, "w" )
-    else:
-        plt.fill(xb2,yb2, '0.75' )
-        plt.fill(xb1,yb1, "w" )
-
-    plt.plot(xmid,ymid,"k--",linewidth=1)
-    plt.plot(xb1,yb1,linewidth=2,color="k")
-    plt.plot(xb2,yb2,linewidth=2,color="k")
-
-    if cones:
-        (xc1, yc1, xc2, yc2) = populateCones( crns, lpar, delTh, width, left, 3. )
-        plt.plot(xc1,yc1,'ro')
-        plt.plot(xc2,yc2,'go')
-
-    plt.axis('equal')
-    plt.show()
-
-def populateCones( crns, lpar, delTh, width, left, aveDist ):
-
-    # dist is distance between cones as computed from midline
-
-    nseg  = len(crns)
-
-    xc1 = np.zeros( (0,) )
-    yc1 = np.zeros( (0,) )
-
-    xc2 = np.zeros( (0,) )
-    yc2 = np.zeros( (0,) )
-
-    thcum = 0.
-
-    for jj in range( 0, nseg ):
-        if crns[jj]:
-
-            r1 = lpar[jj] - width/2
-            r2 = lpar[jj] + width/2
-
-            n1 = int( ceil( delTh[jj] * abs(r1) / aveDist ) ) # number of points used on left boundary
-            n2 = int( ceil( delTh[jj] * abs(r2) / aveDist ) ) # number of points used on right boundary
-
-            phi1 = np.linspace( 0., delTh[jj], n1 )
-            phi2 = np.linspace( 0., delTh[jj], n2 )
-
-            # delete first point
-            phi1 = np.delete( phi1, 0 )
-            phi2 = np.delete( phi2, 0 )
-
-            delx1 =  abs(r1) * np.sin( phi1 ) # local coordinate frame
-            dely1 = r1 - r1  * np.cos( phi1 ) # local coordinate frame
-
-            delx2 =  abs(r2) * np.sin( phi2 ) # local coordinate frame
-            dely2 = r2 - r2  * np.cos( phi2 ) # local coordinate frame
-
-            # map to global coordinate frame
-            x1 = delx1 * cos(thcum) - dely1 * sin(thcum)
-            y1 = dely1 * cos(thcum) + delx1 * sin(thcum)
-
-            x2 = delx2 * cos(thcum) - dely2 * sin(thcum)
-            y2 = dely2 * cos(thcum) + delx2 * sin(thcum)
-
-            if len(xc1) > 0:
-                x1 += xc1[-1]
-                y1 += yc1[-1]
-                x2 += xc2[-1]
-                y2 += yc2[-1]
-
-            # update cumulative angle
-            thcum += np.sign(lpar[jj]) * delTh[jj]
-
-            # append
-            xc1 = np.hstack( [xc1, x1] )
-            yc1 = np.hstack( [yc1, y1] )
-            xc2 = np.hstack( [xc2, x2] )
-            yc2 = np.hstack( [yc2, y2] )
-
-        else:
-
-            n = int( ceil( lpar[jj] / aveDist ) )
-
-            xloc = np.linspace( 0, lpar[jj], n )
-            xloc = np.delete( xloc, 0 )
-
-            x1 = xloc * cos(thcum)
-            y1 = xloc * sin(thcum)
-            x2 = xloc * cos(thcum)
-            y2 = xloc * sin(thcum)
-
-            if len(xc1) > 0:
-                x1 += xc1[-1]
-                y1 += yc1[-1]
-                x2 += xc2[-1]
-                y2 += yc2[-1]
-            else:
-                y1 += width/2
-                y2 -= width/2
-
-            # append
-            xc1 = np.hstack( [xc1, x1] )
-            yc1 = np.hstack( [yc1, y1] )
-            xc2 = np.hstack( [xc2, x2] )
-            yc2 = np.hstack( [yc2, y2] )
-
-    return (xc1, yc1, xc2, yc2)
