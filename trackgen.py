@@ -49,8 +49,12 @@ class Track( object ):
         self.xb2 = np.zeros( (0,) )
         self.yb1 = np.zeros( (0,) )
         self.yb2 = np.zeros( (0,) )
-        self.xm  = np.zeros( (0,) )
-        self.ym  = np.zeros( (0,) )
+
+        # midline
+        self.xm = np.zeros( (0,) )
+        self.ym = np.zeros( (0,) )
+        self.sm = np.zeros( (0,) )
+        self.th = np.zeros( (0,) )
 
         # cones
         self.xc1 = np.zeros( (0,) )
@@ -158,7 +162,7 @@ class Track( object ):
             plt.fill(self.xb2,self.yb2, '0.75' )
             plt.fill(self.xb1,self.yb1, 'w' )
 
-        plt.plot(self.xmid,self.ymid,'k--',linewidth=1)
+        plt.plot(self.xm,self.ym,'k--',linewidth=1)
         plt.plot(self.xb1,self.yb1,linewidth=2,color='k')
         plt.plot(self.xb2,self.yb2,linewidth=2,color='k')
 
@@ -180,8 +184,9 @@ class Track( object ):
         ncrns = sum(self.crns)
         npts  = ncrns * nplot + ( nseg - ncrns ) * 2 + 1
 
-        xmid = np.zeros( (npts,) )
-        ymid = np.zeros( (npts,) )
+        xmid  = np.zeros( (npts,) )
+        ymid  = np.zeros( (npts,) )
+        smid  = np.zeros( (npts,) )
 
         theta = np.zeros( (npts,) )
 
@@ -204,13 +209,19 @@ class Track( object ):
                 thcum += np.sign(self.lpar[jj]) * self.delTh[jj]
                 theta[(ind+1):(ind+nplot+1)] = theta[ind] + np.sign(self.lpar[jj]) * phi
 
+                # update distance
+                smid[(ind+1):(ind+nplot+1)] = smid[ind] + abs(self.lpar[jj]) * phi
+
                 ind += nplot
 
             else:
                 xmid[ind+1] = xmid[ind]
                 ymid[ind+1] = ymid[ind]
+                smid[ind+1] = smid[ind]
+
                 xmid[ind+2] = xmid[ind] + self.lpar[jj] * cos(thcum)
                 ymid[ind+2] = ymid[ind] + self.lpar[jj] * sin(thcum)
+                smid[ind+2] = smid[ind] + self.lpar[jj]
 
                 theta[ind+1] = theta[ind]
                 theta[ind+2] = theta[ind]
@@ -222,8 +233,10 @@ class Track( object ):
         self.xb2 = xmid - self.width/2 * np.sin( theta )
         self.yb2 = ymid + self.width/2 * np.cos( theta )
 
-        self.xmid = xmid
-        self.ymid = ymid
+        self.xm = xmid
+        self.ym = ymid
+        self.th = theta
+        self.sm = smid
 
     def populateCones( self, aveDist ):
         '''
