@@ -1,7 +1,8 @@
 import numpy as np
-from math import *
+from math import pi, cos, sin, ceil
 import matplotlib.pyplot as plt
 from scipy.optimize import minimize, Bounds
+from copy import copy
 
 class Track( object ):
     '''
@@ -24,10 +25,21 @@ class Track( object ):
         optimized   Has this track been optimized yet?
     '''
 
-    def __init__( self, length = 500., rmin = 9.,
-                  rmax = 50., lmax = 80., lmin = 5., left = True,
-                  dthmin = pi/6, dthmax = pi,
-                  width = 3., crns = np.zeros( (0,), dtype=bool ) ):
+    def __init__(
+        self,
+        length = 500.,
+        rmin = 9.,
+        rmax = 50.,
+        lmax = 80.,
+        lmin = 5.,
+        left = True,
+        dthmin = pi/6,
+        dthmax = pi,
+        width = 3.,
+        crns = np.zeros( (0,), dtype=bool ),
+        lpar = None,
+        delTh = None,
+    ):
 
         self.length = length
         self.rmin   = rmin
@@ -41,8 +53,8 @@ class Track( object ):
         self.width = width
 
         self.crns  = crns
-        self.lpar  = np.zeros( np.shape(crns), dtype=float )
-        self.delTh = np.zeros( np.shape(crns), dtype=float )
+        self.lpar  = np.zeros( np.shape(crns), dtype=float ) if lpar is None else copy(lpar)
+        self.delTh = np.zeros( np.shape(crns), dtype=float ) if delTh is None else copy(delTh)
 
         # boundaries
         self.xb1 = np.zeros( (0,) )
@@ -140,12 +152,10 @@ class Track( object ):
         '''
         return compEndpoint( self.crns, self.lpar, self.delTh )
 
-    def plot( self, cones=False, aveDist=3. ):
+    def plot( self, cones=False, aveDist=3., show = False, filename = "track.png" ):
         '''
         Plots the track defined in the Track object.
         '''
-        if not self.optimized:
-            warning("Track not optimized!")
 
         if np.shape(self.xb1)[0] == 0:
             self.compTrackXY()
@@ -171,7 +181,10 @@ class Track( object ):
             plt.plot( self.xc2, self.yc2, 'go' )
 
         plt.axis('equal')
-        plt.show()
+        if show:
+            plt.show()
+        if filename is not None:
+            plt.savefig(filename)
 
     def compTrackXY( self ):
         '''

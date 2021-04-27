@@ -1,6 +1,6 @@
 import numpy as np
-from math import *
-from trackgen import *
+from math import pi
+from trackgen import Track
 
 # Where are the corners?
 crns = np.array( [False,True,False,True,True,True,False,True,True,False], dtype=bool )
